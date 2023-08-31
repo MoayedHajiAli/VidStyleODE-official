@@ -1,0 +1,9 @@
+__pycache__
+.ipynb_checkpoints
+logs
+examples*
+.vscode
+pretrained_models
+StyleGAN_Human
+tmp_log_gifs
+env.txt
