@@ -1,3 +1,3 @@
-# VidStyleODE Disentangled Video Editing via StyleGAN and NeuralODEs
+# VidStyleODE Disentangled Video Editing via StyleGAN and NeuralODEs (ICCV 2023)
 
-### Code will be released soon.
+### Instructions will be added soon.
