@@ -1,0 +1,134 @@
+project_title: VideoManipulation
+
+model:
+  base_learning_rate: 2.0e-6
+  target: src.models.vidstyleode.VidStyleODE
+  project : "video-manipulation"
+
+  params:
+    frame_log_size : [256, 192]
+    content_mode : "mean_inversion"
+    video_length : 50
+    sampling_type : "static"
+    n_sampled_frames : 4
+
+    delta_inversion_weight : 0.01
+    l2_latent_eps : 0.02
+    lambda_vgg: 10.0
+    l2_latent_lambda : 1.0
+    manipulation_strength : 2
+
+    clip_loss_lambda:
+      target: src.modules.schedulers.LambdaScheduler
+      params:
+        warm_up_steps: 5000
+        lr_min: 0.01
+        lr_max: 2.5
+        max_decay_steps: 200000
+
+    consistency_lambda:
+      target: src.modules.schedulers.LambdaScheduler
+      params:
+        warm_up_steps: 0
+        lr_min: 0.01
+        lr_max: 1.0
+        max_decay_steps: 40000
+
+    rec_loss_lambda: # used in a small scale for fine-grained details toward the end of the training
+      target: src.modules.schedulers.LambdaScheduler
+      params:
+        warm_up_steps: 50000
+        lr_min: 0.01
+        lr_max: 0.1
+        max_decay_steps: 100000
+
+
+    perceptual_loss_config:
+      target: src.losses.splice_vit.SpliceLoss
+      params:
+        structure_lambda : 0.8
+        cls_layer_num : 8
+
+
+    modulation_network_config:
+      target: src.modules.minigpt.CrossAttentionModulation
+      params:
+        shared_attn_params : False
+        out_dim : 512
+        n_embd : 512 # input dim
+        n_layer : 8
+        content_block_size : 1
+        dyn_attn_n_layer : 6
+        dyn_block_size : 48 # >= (img_size[0] // 2 ^ netE_num_downsampling_sp) * (img_size[1] // 2 ^ netE_num_downsampling_sp)
+        n_head : 8
+
+    video_ecnoder_config:
+      target: src.modules.video_encoder.VideoEncoderWLatentODE
+      params:
+        img_size : [128, 96] 
+        dynamic_latent_out_dim : 512 # must match ODE_func_config latent_dim
+        spatial_code_ch : 256 # hidden dim
+        netE_num_downsampling_sp : 4
+
+    stylegan_gen_config:
+      target: src.modules.stylegan_wraper.StyleGAN2Generator
+      params:
+        pkl_file: /kuacc/users/abond19/VideoEditing/dicomogan/StyleGAN_Human/ckpts/stylegan_human_v2_1024.pkl
+
+
+    style_mapper_config:
+      target: src.modules.mapper.AttentionAttributeMapper # TripleAttributeMapper
+      params:
+        predict_delta: True
+        use_coarse_mapper: [True, False, False] # Since the coarse mapper only handles pose, we don't want to do any modulation
+        use_medium_mapper: [True, False, False]
+        use_fine_mapper: [True, False, False]
+        coarse_cut_flag: False
+        medium_cut_flag: False
+        fine_cut_flag: False
+        mod_shape : [[1, 4, 1], [1, 4, 1], [1, 10, 1]]
+        num_of_layers : [7, 5, 5]
+        attr_vec_dims: [512, 0, 0] #much match W_cont + CLIP embedding
+
+
+
+data:
+  target: main.DataModuleFromConfig
+  params:
+    batch_size: 3 # MUST Match batch size in dataset
+    num_workers: 20
+    train:
+      target: src.data.dataset.ImageCaptionFolderDataset # Changed from data.video.ImageCaptionFolderDataset to data.dataset.ImageCaptionFolderDataset
+      params:
+        video_list: data/fashion/fashion_train_videos.txt
+        img_root:  datasets/aligned_fashion_dataset
+        inversion_root: datasets/w+_fashion_dataset/fashion/PTI
+        inverted_img_root : null # optional, add if you want to log the frame-by-frame inverted video
+        skip_frames : 5
+        n_sampled_frames : 8
+        irregular_sampling : True
+        batch_size : 3 # MUST match the loader batch size
+        size : [256, 192]
+        # attribute : "Sleeves"
+        # attribute_stats : 'data/fashion/attributes_stats.yaml'
+
+    validation:
+      target: src.data.dataset.ImageCaptionFolderDataset # Changed from data.video.ImageCaptionFolderDataset to data.dataset.ImageCaptionFolderDataset
+      params:
+        video_list: data/fashion/fashion_test_videos.txt
+        img_root: datasets/aligned_fashion_dataset
+        inversion_root: datasets/w+_fashion_dataset/fashion/PTI
+        inverted_img_root : null # optional, add if you want to log the frame-by-frame inverted video
+        skip_frames : 5
+        n_sampled_frames : 15
+        irregular_sampling : False
+        batch_size : 3 # MUST match the loader batch size
+        size : [256, 192]
+        # attribute : "Sleeves"
+        # attribute_stats : 'data/fashion/attributes_stats.yaml'
+
+
+lightning:
+  trainer:
+    limit_val_batches : 2 # logging gifs is expensice
+    replace_sampler_ddp : False
