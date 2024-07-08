@@ -1,4 +1,4 @@
-project_title: VideoManipulation
+project_title: VidStyleODE
 
 model:
   base_learning_rate: 2.0e-6
@@ -6,11 +6,11 @@ model:
   project : "video-manipulation"
 
   params:
-    frame_log_size : [256, 192]
+    frame_log_size : [256, 192] 
     content_mode : "mean_inversion"
-    video_length : 50
-    sampling_type : "static"
-    n_sampled_frames : 4
+    video_length : 50 # estimate number of frames per video
+    sampling_type : "static" # static, interpolate, or extrapolate. Interpolate masks intermediate frames while training, and extrapolate masks last few frames.
+    n_sampled_frames : 4 # number of frames to sample for backpropagation at each training step, reduce for a smaller memory contraints
 
     delta_inversion_weight : 0.01
     l2_latent_eps : 0.02
@@ -95,7 +95,7 @@ model:
 data:
   target: main.DataModuleFromConfig
   params:
-    batch_size: 3 # MUST Match batch size in dataset
+    batch_size: &bs 3 # MUST Match batch size in dataset
     num_workers: 20
     train:
       target: src.data.dataset.ImageCaptionFolderDataset # Changed from data.video.ImageCaptionFolderDataset to data.dataset.ImageCaptionFolderDataset
@@ -107,7 +107,7 @@ data:
         skip_frames : 5
         n_sampled_frames : 8
         irregular_sampling : True
-        batch_size : 3 # MUST match the loader batch size
+        batch_size : *bs # MUST match the loader batch size
         size : [256, 192]
         # attribute : "Sleeves"
         # attribute_stats : 'data/fashion/attributes_stats.yaml'
@@ -122,7 +122,7 @@ data:
         skip_frames : 5
         n_sampled_frames : 15
         irregular_sampling : False
-        batch_size : 3 # MUST match the loader batch size
+        batch_size : *bs # MUST match the loader batch size
         size : [256, 192]
         # attribute : "Sleeves"
         # attribute_stats : 'data/fashion/attributes_stats.yaml'
@@ -131,4 +131,3 @@ data:
 lightning:
   trainer:
     limit_val_batches : 2 # logging gifs is expensice
-    replace_sampler_ddp : False

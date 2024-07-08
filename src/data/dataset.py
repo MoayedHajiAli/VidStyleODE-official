@@ -66,6 +66,7 @@ class ImageCaptionFolderDataset(data.Dataset):
             self.attribute_stats = self.load_yaml(attribute_stats)
 
         self.data_paths, self.inverted_img_paths, self.inversion_paths, self.desc_paths, self.frame_numbers, self.attributes = self._load_dataset()
+        print("Dataset size", len(self.data_paths))
 
     def _load_dataset(self):
         data_paths, inverted_img_paths, inversion_paths, desc_paths, frame_numbers, attributes = [], [], [], [], [], []
@@ -73,7 +74,7 @@ class ImageCaptionFolderDataset(data.Dataset):
         videos = []
         for idx, vid_path in enumerate(self.video_list):
             paths, im_paths, i_paths, d_paths, f_nums = {}, {}, {}, [], []
-            fname = vid_path[:-1]
+            fname = vid_path.strip()
             mn_idx = None
             for f in sorted(os.listdir(os.path.join(self.img_root, fname)))[self.skip_frames:]:
                 if is_image_file(f):

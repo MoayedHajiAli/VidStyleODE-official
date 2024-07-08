@@ -111,7 +111,7 @@ def save_gif(video, range, save_path):
             frame = torchvision.utils.make_grid(b_frames,
                             nrow=b_frames.shape[0],
                             normalize=True,
-                            range=range).detach().cpu().numpy()
+                            value_range=range).detach().cpu().numpy()
             frame = (np.transpose(frame, (1, 2, 0)) * 255).astype(np.uint8)
             writer.append_data(frame)
 
@@ -131,7 +131,7 @@ def concat_and_save_gif(videos, ref_frame, titles, val_range, save_path):
             frame = torchvision.utils.make_grid(b_frame,
                             nrow=b_frame.shape[0],
                             normalize=True,
-                            range=val_range).detach().cpu().numpy()
+                            value_range=val_range).detach().cpu().numpy()
             frame = Image.fromarray((np.transpose(frame, (1, 2, 0)) * 255).astype(np.uint8))
             frames.append(frame)
         all_frames.append(stack_imgs(frames, titles))
@@ -161,7 +161,7 @@ def main(args):
     # process
     for video in tqdm(content_frames):
         src_lst = np.array(read_lines(os.path.join(args.src_text_list, video, "src_txt.txt")))
-        tgt_lst = np.array(read_lines(os.path.join(args.src_text_list, video, "tgt_txt.txt")))
+        tgt_lst = np.array(read_lines(os.path.join(args.tgt_text_list, video, "tgt_txt.txt")))
         txt_inds = sorted(np.random.choice(len(src_lst), min(args.spv,len(src_lst)), replace=False))
         src_lst = src_lst[txt_inds]
         tgt_lst = tgt_lst[txt_inds]

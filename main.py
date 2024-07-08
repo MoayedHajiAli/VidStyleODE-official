@@ -23,11 +23,10 @@ import pytorch_lightning as pl
 from pytorch_lightning import seed_everything
 from pytorch_lightning.trainer import Trainer
 from pytorch_lightning.callbacks import Callback
-from pytorch_lightning.utilities.distributed import rank_zero_only # decorator to ensure that only the first processor execute the method
+from pytorch_lightning.utilities import rank_zero_only# decorator to ensure that only the first processor execute the method
 
 import pandas as pd
 from src.utils import *
-from pytorch_lightning.plugins import DDPPlugin
 from torch.utils.data.distributed import DistributedSampler
 import wandb
 
@@ -86,7 +85,7 @@ def get_parser(**parser_kwargs):
         "--no-test",
         type=str2bool,
         const=True,
-        default=False,
+        default=True,
         nargs="?",
         help="disable test",
     )
@@ -156,7 +155,6 @@ def get_parser(**parser_kwargs):
 
 def nondefault_trainer_args(opt):
     parser = argparse.ArgumentParser()
-    parser = Trainer.add_argparse_args(parser)
     args = parser.parse_args([])
     return sorted(k for k in vars(args) if getattr(opt, k) != getattr(args, k))
 
@@ -210,19 +208,19 @@ class DataModuleFromConfig(pl.LightningDataModule):
                 self.datasets[k] = WrappedDataset(self.datasets[k])
 
     def _train_dataloader(self):
-        train_sampler = DistributedSampler(self.datasets["train"], shuffle=False, drop_last=True)
+        # train_sampler = DistributedSampler(self.datasets["train"], shuffle=False, drop_last=True)
         dataloader = DataLoader(self.datasets["train"], batch_size=self.batch_size,
-                          num_workers=self.num_workers, shuffle=False, drop_last=True, sampler=train_sampler) # ATTENTION: shuffle should stay false to consistent sampling
+                          num_workers=self.num_workers, shuffle=False, drop_last=True) # ATTENTION: shuffle should stay false to consistent sampling
         return dataloader
 
     def _val_dataloader(self):
         return DataLoader(self.datasets["validation"],
                           batch_size=self.batch_size,
-                          num_workers=self.num_workers, shuffle=False,  drop_last=True, sampler=DistributedSampler(self.datasets["validation"], shuffle=False, drop_last=True))
+                          num_workers=self.num_workers, shuffle=False,  drop_last=True)
 
     def _test_dataloader(self):
         return DataLoader(self.datasets["test"], batch_size=self.batch_size,
-                          num_workers=self.num_workers, shuffle=False,  drop_last=True, sampler=DistributedSampler(self.datasets["test"], shuffle=False, drop_last=True))
+                          num_workers=self.num_workers, shuffle=False,  drop_last=True)
 
 
 class SetupCallback(Callback):
@@ -288,7 +286,7 @@ class LossLogger(Callback):
         print(log_dir)
         self.loss_loggers = {
             pl.loggers.WandbLogger: self._wandb,
-            pl.loggers.TestTubeLogger: self._testtube,
+            # pl.loggers.TestTubeLogger: self._testtube, # Disable testtube for now
         }
         self.log_dir = log_dir
         os.makedirs(os.path.join(log_dir, 'figures') , exist_ok=True)
@@ -365,7 +363,7 @@ class ImageLogger(Callback):
         self.max_images = max_images
         self.logger_log_images = {
             pl.loggers.WandbLogger: self._wandb,
-            pl.loggers.TestTubeLogger: self._testtube,
+            # pl.loggers.TestTubeLogger: self._testtube, #disable TestTubeLogger for now
         }
         self.log_steps = [2 ** n for n in range(int(np.log2(self.batch_freq)) + 1)]
         if not increase_log_steps:
@@ -391,7 +389,7 @@ class ImageLogger(Callback):
                 grid = torchvision.utils.make_grid(images[k],
                                 nrow=ncol,
                                 normalize=True,
-                                range=(-1, 1))
+                                value_range=(-1, 1))
             else:
                 grid = images[k]
             caption = None
@@ -501,10 +499,10 @@ class ImageLogger(Callback):
             return True
         return False
 
-    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx):
+    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
         self.log_img(pl_module, batch, batch_idx, split="train")
 
-    def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx):
+    def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
         self.log_img(pl_module, batch, batch_idx, split="val")
 
 
@@ -518,7 +516,6 @@ if __name__ == "__main__":
     sys.path.append(os.getcwd())
 
     parser = get_parser()
-    parser = Trainer.add_argparse_args(parser)
 
     opt, unknown = parser.parse_known_args()
 
@@ -621,7 +618,11 @@ if __name__ == "__main__":
         os.makedirs(logdir, exist_ok=True)
         os.makedirs(os.path.join(logdir, 'wandb'), exist_ok=True)
         default_logger_cfg = default_logger_cfgs["wandb"]
-        logger_cfg = lightning_config.logger or OmegaConf.create()
+        if 'logger' in lightning_config:
+            logger_cfg = lightning_config.logger  
+        else:
+            logger_cfg = OmegaConf.create()
+        
         logger_cfg = OmegaConf.merge(default_logger_cfg, logger_cfg)
         trainer_kwargs["logger"] = instantiate_from_config(logger_cfg)
 
@@ -640,7 +641,10 @@ if __name__ == "__main__":
             default_modelckpt_cfg["params"]["monitor"] = model.monitor
             default_modelckpt_cfg["params"]["save_top_k"] = 3
 
-        modelckpt_cfg = lightning_config.modelcheckpoint or OmegaConf.create()
+        if 'modelcheckpoint' in lightning_config:
+            modelckpt_cfg = lightning_config.modelcheckpoint 
+        else:
+            modelckpt_cfg = OmegaConf.create()
         modelckpt_cfg = OmegaConf.merge(default_modelckpt_cfg, modelckpt_cfg)
         print("Model ckpt args:", modelckpt_cfg)
         trainer_kwargs["checkpoint_callback"] = instantiate_from_config(modelckpt_cfg)
@@ -677,17 +681,24 @@ if __name__ == "__main__":
                 }
             },
         }
-        callbacks_cfg = lightning_config.callbacks or OmegaConf.create()
+        if 'callbacks' in lightning_config:
+            callbacks_cfg = lightning_config.callbacks 
+        else:
+            callbacks_cfg = OmegaConf.create()
+            
         callbacks_cfg = OmegaConf.merge(default_callbacks_cfg, callbacks_cfg)
         trainer_kwargs["callbacks"] = [
             instantiate_from_config(callbacks_cfg[k], model=model) if k == 'setup_callback' else instantiate_from_config(callbacks_cfg[k])
             for k in callbacks_cfg]
         trainer_kwargs["callbacks"].append(instantiate_from_config(modelckpt_cfg))
-
+        
+        # no need to pass model checkpoint separately
+        del trainer_kwargs['checkpoint_callback']
+        
         if opt.resume:
-            trainer = Trainer.from_argparse_args(trainer_opt, **trainer_kwargs, strategy=DDPPlugin(find_unused_parameters=False), resume_from_checkpoint=ckpt)
+            trainer = Trainer(**vars(trainer_opt), **trainer_kwargs, resume_from_checkpoint=ckpt)
         else:
-            trainer = Trainer.from_argparse_args(trainer_opt, **trainer_kwargs, strategy=DDPPlugin(find_unused_parameters=False))
+            trainer = Trainer(**vars(trainer_opt), **trainer_kwargs)
         # configure learning rate
         bs, base_lr = config.data.params.batch_size, config.model.base_learning_rate
         print("Batch size:", bs)
@@ -695,7 +706,8 @@ if __name__ == "__main__":
             ngpu = len(lightning_config.trainer.gpus.strip(",").split(','))
         else:
             ngpu = 1
-        accumulate_grad_batches = lightning_config.trainer.accumulate_grad_batches or 1
+        
+        accumulate_grad_batches = lightning_config.trainer.get('accumulate_grad_batches', 1)
         print(f"accumulate_grad_batches = {accumulate_grad_batches}")
         lightning_config.trainer.accumulate_grad_batches = accumulate_grad_batches
         model.learning_rate = accumulate_grad_batches * ngpu * bs * base_lr
@@ -729,6 +741,8 @@ if __name__ == "__main__":
 
         # model unlearnable params
         print("Model non-learnable params:",  sum(p.numel() for p in model.parameters() if not p.requires_grad))
+        print("Size of training dataset:", len(data.datasets['train']))
+        print("Size of validation dataset:", len(data.datasets['validation']))
         # run
         if opt.train:
             try:

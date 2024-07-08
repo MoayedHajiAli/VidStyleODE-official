@@ -134,7 +134,7 @@ class VidStyleODE(pl.LightningModule):
 
     def on_train_epoch_start(self,):
         # shuffle training data
-        self.trainer.train_dataloader.dataset.datasets.reset()
+        self.trainer.train_dataloader.dataset.reset()
 
     def video_dynamic_rep(self, vid_bf, ts, mask):
         """
@@ -559,7 +559,7 @@ class VidStyleODE(pl.LightningModule):
                 frame = torchvision.utils.make_grid(b_frames,
                                 nrow=b_frames.shape[0],
                                 normalize=True,
-                                range=range).detach().cpu().numpy()
+                                value_range=range).detach().cpu().numpy()
                 frame = (np.transpose(frame, (1, 2, 0)) * 255).astype(np.uint8)
                 writer.append_data(frame)
 

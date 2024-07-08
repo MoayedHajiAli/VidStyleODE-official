@@ -108,7 +108,7 @@ def save_gif(video, range, save_path):
             frame = torchvision.utils.make_grid(b_frames,
                             nrow=b_frames.shape[0],
                             normalize=True,
-                            range=range).detach().cpu().numpy()
+                            value_range=range).detach().cpu().numpy()
             frame = (np.transpose(frame, (1, 2, 0)) * 255).astype(np.uint8)
             writer.append_data(frame)
 
@@ -130,7 +130,7 @@ def concat_and_save_gif(driving_videos, videos, ref_frame, titles, val_range, sa
             frame = torchvision.utils.make_grid(b_frame,
                             nrow=b_frame.shape[0],
                             normalize=True,
-                            range=val_range).detach().cpu().numpy()
+                            value_range=val_range).detach().cpu().numpy()
             frame = Image.fromarray((np.transpose(frame, (1, 2, 0)) * 255).astype(np.uint8))
             frames.append(frame)
         all_frames.append(stack_imgs(frames))
@@ -144,7 +144,7 @@ def concat_and_save_gif(driving_videos, videos, ref_frame, titles, val_range, sa
             frame = torchvision.utils.make_grid(b_frame,
                             nrow=b_frame.shape[0],
                             normalize=True,
-                            range=val_range).detach().cpu().numpy()
+                            value_range=val_range).detach().cpu().numpy()
             frame = Image.fromarray((np.transpose(frame, (1, 2, 0)) * 255).astype(np.uint8))
             frames.append(frame)
         all_driving.append(stack_imgs(frames, names))
