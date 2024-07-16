@@ -584,10 +584,12 @@ if __name__ == "__main__":
 
         print("Finished initializing the model")
 
-        if opt.resume:
-            print(f"Loading model from ckpt f{ckpt}")
-            model = model.load_from_checkpoint(ckpt, **config.model.params, strict=opt.strict)
-            print(f"Ckpt loaded from f{ckpt}")
+        
+        # Legacy: as we now resume from the checkpoint directly, there is not neeed to load the model from the checkpoint
+        # if opt.resume:
+        #     print(f"Loading model from ckpt f{ckpt}")
+        #     model = model.load_from_checkpoint(ckpt, **config.model.params, strict=opt.strict)
+        #     print(f"Ckpt loaded from f{ckpt}")
        
         # trainer and callbacks
         trainer_kwargs = dict()
@@ -695,10 +697,8 @@ if __name__ == "__main__":
         # no need to pass model checkpoint separately
         del trainer_kwargs['checkpoint_callback']
         
-        if opt.resume:
-            trainer = Trainer(**vars(trainer_opt), **trainer_kwargs, resume_from_checkpoint=ckpt)
-        else:
-            trainer = Trainer(**vars(trainer_opt), **trainer_kwargs)
+        
+        trainer = Trainer(**vars(trainer_opt), **trainer_kwargs)
         # configure learning rate
         bs, base_lr = config.data.params.batch_size, config.model.base_learning_rate
         print("Batch size:", bs)
@@ -746,7 +746,11 @@ if __name__ == "__main__":
         # run
         if opt.train:
             try:
-                trainer.fit(model, data)
+                if opt.resume:
+                    print(f"[INFO] resuming training from checkpoint {ckpt}")
+                    trainer.fit(model, data, ckpt_path=ckpt)
+                else:
+                    trainer.fit(model, data)
             except Exception:
                 melk()
                 raise

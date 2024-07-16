@@ -120,6 +120,13 @@ python main.py --name <tag-for-your-experiment> \
                --base <path-to-config-file>
 ```
 
+- To resume the training, run the following command 
+```
+python main.py --name <tag-for-your-experiment> \
+               --base <path-to-config-file> \
+               --resume <path-to-log-directory>
+```
+
 By default, the training checkpoint and figures will be logged under `logs` folder as well as into wandb. Therefore, please log in to wandb by running 
 ```
 wandb login
