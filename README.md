@@ -124,7 +124,7 @@ python main.py --name <tag-for-your-experiment> \
 ```
 python main.py --name <tag-for-your-experiment> \
                --base <path-to-config-file> \
-               --resume <path-to-log-directory>
+               --resume <path-to-log-directory> or <path-to-checkpoint>
 ```
 
 By default, the training checkpoint and figures will be logged under `logs` folder as well as into wandb. Therefore, please log in to wandb by running 
